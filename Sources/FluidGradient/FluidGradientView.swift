@@ -7,7 +7,7 @@
 
 import SwiftUI
 import Combine
- 
+
 #if os(OSX)
 import AppKit
 public typealias SystemColor = NSColor
@@ -39,7 +39,7 @@ public class FluidGradientView: SystemView {
             highlightLayer.compositingFilter = compositingFilter
         }
         
-        #if os(OSX)
+#if os(OSX)
         layer = ResizableLayer()
         
         wantsLayer = true
@@ -51,10 +51,10 @@ public class FluidGradientView: SystemView {
         
         self.layer?.addSublayer(baseLayer)
         self.layer?.addSublayer(highlightLayer)
-        #else
+#else
         self.layer.addSublayer(baseLayer)
         self.layer.addSublayer(highlightLayer)
-        #endif
+#endif
         
         create(blobs, layer: baseLayer)
         create(highlights, layer: highlightLayer)
@@ -96,29 +96,43 @@ public class FluidGradientView: SystemView {
         let layers = (baseLayer.sublayers ?? []) + (highlightLayer.sublayers ?? [])
         for layer in layers {
             if let layer = layer as? BlobLayer {
-                Timer.publish(every: .random(in: 0.8/speed...1.2/speed),
-                              on: .main,
-                              in: .common)
-                    .autoconnect()
-                    .sink { _ in
-                        #if os(OSX)
-                        let visible = self.window?.occlusionState.contains(.visible)
-                        guard visible == true else { return }
-                        #endif
-                        layer.animate(speed: speed)
-                    }
-                    .store(in: &cancellables)
+                setupTimer(for: layer, speed: speed)
+                startImmediateAnimation(for: layer, speed: speed)
             }
         }
     }
     
+    private func setupTimer(for layer: BlobLayer, speed: CGFloat) {
+        let timerPublisher = Timer.publish(every: .random(in: 0.8 / speed...1.2 / speed),
+                                           on: .main,
+                                           in: .common)
+            .autoconnect()
+        
+        timerPublisher
+            .sink { _ in
+#if os(OSX)
+                let visible = self.window?.occlusionState.contains(.visible)
+                guard visible == true else { return }
+#endif
+                layer.animate(speed: speed)
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func startImmediateAnimation(for layer: BlobLayer, speed: CGFloat) {
+#if os(OSX)
+        let visible = self.window?.occlusionState.contains(.visible)
+        guard visible == true else { return }
+#endif
+        layer.animate(speed: speed)
+    }
     /// Compute and update new blur value
     private func updateBlur() {
         delegate?.updateBlur(min(frame.width, frame.height))
     }
     
     /// Functional methods
-    #if os(OSX)
+#if os(OSX)
     public override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         let scale = window?.backingScaleFactor ?? 2
@@ -132,7 +146,7 @@ public class FluidGradientView: SystemView {
     public override func resize(withOldSuperviewSize oldSize: NSSize) {
         updateBlur()
     }
-    #else
+#else
     public override func layoutSubviews() {
         layer.frame = self.bounds
         baseLayer.frame = self.bounds
@@ -140,7 +154,7 @@ public class FluidGradientView: SystemView {
         
         updateBlur()
     }
-    #endif
+#endif
 }
 
 protocol FluidGradientDelegate: AnyObject {
